@@ -85,4 +85,18 @@ if uploaded_file:
             prompt = f"""
             你是一名頂級量化分析師。請針對交易員正在使用的【策略 {strategy_mode}】進行審計。
             
-            【SOP 規則】：{m
+            【SOP 規則】：{my_strategy}
+            【交易數據】：{data_str}
+            【背景感悟】：{trade_context}
+            
+            任務：
+            1. 找出虧損單中除了 SOP 之外的共同環境因素。
+            2. 如果是策略 B (機構獵殺)，重點分析 H4 影線確認是否準確？OB 區域是否被二次回測？
+            3. 分析 MAEx (最大反向點數)，評估 SL 緩衝是否合理。
+            4. 根據 Funding 帳戶或個人大帳戶的特性，給出 2 條進化建議。
+            """
+            st.success("🔬 策略研究報告已生成：")
+            st.markdown(get_ai_response(prompt, api_key))
+
+st.divider()
+st.caption(f"TRADE AI | 當前模式: {strategy_mode} | 極致理性")
