@@ -1,91 +1,102 @@
 import streamlit as st
 import google.generativeai as genai
 import pandas as pd
-from PIL import Image
 import feedparser
 
-# 1. 網頁設置
-st.set_page_config(page_title="TRADE AI - 終極交易終端", layout="wide")
+# 1. 网页设置
+st.set_page_config(page_title="TRADE AI - 5星预警终端", layout="wide")
 
-# --- 側邊欄：導航與核心配置 ---
+# --- 侧边栏：核心配置 ---
 with st.sidebar:
-    st.title("🛡️ TRADE AI 終端")
-    api_key = st.text_input("🔑 輸入 Gemini API Key:", type="password")
+    st.title("🛡️ 5星预警终端")
+    api_key = st.text_input("🔑 输入 API Key:", type="password")
     
     st.divider()
     menu = st.radio(
-        "切換工作區：",
-        ["🌅 每日晨報：隔夜大事", "📡 實時作戰：基本面與劇本", "🔬 週末研究：策略實驗室"]
+        "工作模式：",
+        ["💣 5星级核弹快讯", "🔬 策略量化研究室"]
     )
     
     st.divider()
-    st.subheader("📜 核心 SOP (Funding Pips 5k)")
-    default_sop = """
-    【環境】：H1 ATR(14) > 5
-    【結構】：H1 連續2根同色K線 -> 拉 Fibo
-    【進場】：M5 回撤至 0.618-1.0 + 吞沒K線
-    【防禦】：盈虧比 1:1；0.5R時止損手動減半
-    【強平】：週五 23:30 強制平倉
-    """
-    my_strategy = st.text_area("當前 SOP 規則：", value=default_sop, height=200)
+    st.subheader("📜 核心 SOP")
+    default_sop = "【環境】：H1 ATR > 5 | 【結構】：H1 同色K線 -> Fibo | 【進場】：M5 0.618 + 吞沒 | 【防禦】：0.5R止損減半"
+    my_strategy = st.text_area("当前 SOP 规则：", value=default_sop, height=150)
 
-# --- AI 核心函數 (自動匹配可用模型，徹底解決404) ---
+# --- AI 核心函数 (自动匹配模型) ---
 def get_ai_response(prompt, key):
-    if not key:
-        return "👈 請先在左側輸入 API Key 以啟動系統。"
+    if not key: return None
     try:
         genai.configure(api_key=key)
-        # 自動搜尋可用模型
-        available_models = []
-        for m in genai.list_models():
-            if 'generateContent' in m.supported_generation_methods:
-                available_models.append(m.name.replace('models/', ''))
-        
-        if not available_models:
-            return "❌ 你的 API Key 暫無可用模型權限。"
-        
-        # 選擇最強模型 (優先選 flash，其次選 pro)
+        available_models = [m.name.replace('models/', '') for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
         best_model = "gemini-1.5-flash" if "gemini-1.5-flash" in available_models else available_models[0]
         model = genai.GenerativeModel(best_model)
-        
-        # 發送請求
-        response = model.generate_content(prompt)
-        return response.text
+        return model.generate_content(prompt).text
     except Exception as e:
-        return f"AI 服務異常: {e}"
+        return f"AI 异常: {e}"
 
-# --- 功能：自動抓取 CNBC 宏觀新聞源 ---
-def fetch_macro_news():
-    try:
-        rss_url = "https://search.cnbc.com/rs/search/view.xml?partnerId=2000&keywords=macroeconomics&sort=date"
-        feed = feedparser.parse(rss_url)
-        news_list = []
-        for entry in feed.entries[:10]: # 抓取最新的 10 條
-            news_list.append(f"標題: {entry.title} \n摘要: {entry.summary}")
-        return "\n\n".join(news_list)
-    except:
-        return "無法獲取新聞流，請手動粘贴消息進行分析。"
+# --- 功能：抓取全球新闻流 ---
+def fetch_raw_data():
+    rss_url = "https://search.cnbc.com/rs/search/view.xml?partnerId=2000&keywords=macroeconomics&sort=date"
+    feed = feedparser.parse(rss_url)
+    return "\n\n".join([f"标题: {e.title} \n摘要: {e.summary}" for e in feed.entries[:15]])
 
-# --- 模塊一：🌅 每日晨報 ---
-if menu == "🌅 每日晨報：隔夜大事":
-    st.title("🌅 隔夜宏觀早報")
-    st.write("點擊按鈕，AI 將自動掃描全球宏觀資訊並過濾黃金(XAUUSD)相關大事。")
+# --- 模块一：💣 5星级核弹快讯 ---
+if menu == "💣 5星级核弹快讯":
+    st.title("💣 5星级宏观核弹预警")
+    st.write("系统会自动过滤所有低价值噪音，只有达到 5 星级（影响评分 >= 9）的资讯才会显示。")
     
-    if st.button("🚀 獲取今日晨報"):
-        with st.spinner("軍師正在翻閱全球財經報紙..."):
-            raw_news_data = fetch_macro_news()
+    if st.button("🚀 扫描昨夜至今的 5 星事件"):
+        with st.spinner("正在排查垃圾信息..."):
+            raw_data = fetch_raw_data()
             prompt = f"""
-            你是一名頂級分析師。請分析過去24小時的新聞：
-            {raw_news_data}
+            你是一名极其严苛的黄金/外汇首席风控官。
+            请分析以下新闻流：
+            {raw_data}
             
-            任務：
-            1. 總結最重要的 3 條黃金/美元相關大事。
-            2. 給出每件事的影響分 (1-10分)。
-            3. 根據我的 SOP ({my_strategy})，給出今日交易的總體心態建議。
-            用大白話總結。
+            任务：
+            1. 严格过滤：只有能让 XAUUSD 或美元指数产生重磅波动（打分必须 >= 9）的事件才准许输出。
+            2. 如果没有任何 5 星级大事，请只回答：“当前市场暂无 5 星级核弹新闻。”
+            3. 如果有，请用大红色的警告语气列出事件。
+            4. 结合我的 SOP ({my_strategy}) 给出最直接的防守指令。
             """
-            st.markdown("---")
-            st.success("✅ 今日晨報已生成：")
-            st.markdown(get_ai_response(prompt, api_key))
+            result = get_ai_response(prompt, api_key)
+            if "暂无" in result:
+                st.info(result)
+            else:
+                st.error("🚨 探测到 5 星级影响事件！")
+                st.markdown(result)
 
-# --- 模塊二：📡 實時作戰 --
+    st.divider()
+    st.subheader("📝 手动快讯查验")
+    user_news = st.text_area("粘贴你想确认的一条快讯：", placeholder="AI 将判断这是否值得你关注...")
+    if st.button("查验级别") and api_key:
+        check_prompt = f"分析此消息影响力。如果评分不足 9 分，请直接告诉交易员‘这是噪音，不用理会’。如果超过 9 分，请分析对黄金的具体冲击。消息：{user_news}"
+        st.warning(get_ai_response(check_prompt, api_key))
+
+# --- 模块二：🔬 策略量化研究室 ---
+else:
+    st.title("🔬 策略量化与模式识别")
+    st.write("上传你的 CSV 交易记录，AI 将找出人类肉眼看不见的【盈利/亏损隐藏共性】。")
+    
+    uploaded_file = st.file_uploader("导入 CSV 历史数据", type="csv")
+    if uploaded_file and api_key:
+        df = pd.read_csv(uploaded_file)
+        st.dataframe(df.head(5))
+        
+        if st.button("🧪 开启深度量化审计"):
+            with st.spinner("正在进行多维度聚类分析..."):
+                data_str = df.to_string()
+                prompt = f"""
+                你是一名量化数据科学家。
+                【SOP】：{my_strategy}
+                【数据】：{data_str}
+                任务：
+                1. 找出亏损单中除了 SOP 之外的【隐藏共性】（时间、ATR、美元状态、RSI等）。
+                2. 告诉交易员他在哪种特定环境下必亏。
+                3. 给出现有 SOP 的进化建议。
+                """
+                st.markdown(get_ai_response(prompt, api_key))
+
+# 底部
+st.divider()
+st.caption("TRADE AI | 极致过滤 | 深度进化")
