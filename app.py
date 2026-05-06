@@ -5,28 +5,37 @@ import feedparser
 from PIL import Image
 
 # 1. 網頁全域設置
-st.set_page_config(page_title="TRADE AI - 終極進化終端", layout="wide")
+st.set_page_config(page_title="TRADE AI - 多策略進化終端", layout="wide")
 
-# --- 側邊欄：核心配置與賬戶健康監控 ---
+# --- 側邊欄：多策略配置 ---
 with st.sidebar:
     st.title("🛡️ 交易核心配置")
     api_key = st.text_input("🔑 Gemini API Key:", type="password")
     
     st.divider()
-    # 賬戶健康度監控 (針對 Funding Pips 5k 帳戶)
-    st.subheader("💰 賬戶健康度")
-    curr_balance = st.number_input("當前餘額 (Current Balance):", value=5000.0)
-    # Funding Pips 5k 的每日 5% 風險限額計算
-    daily_drawdown_limit = curr_balance * 0.05
-    total_drawdown_limit = 5000 * 0.10 # 初始資金的 10%
-    
-    st.metric(label="今日最大回撤限額 (5%)", value=f"${daily_drawdown_limit:.2f}")
-    st.metric(label="帳戶總爆倉線 (10%)", value=f"${5000 - total_drawdown_limit:.2f}")
+    # 策略切換開關
+    strategy_mode = st.selectbox(
+        "選擇當前執行策略：",
+        ["A. 5k 極限防守 (Funding Pips)", "B. 100k 機構獵殺 (Institutional)"]
+    )
     
     st.divider()
-    st.subheader("📜 核心 SOP 規則")
-    default_sop = "【環境】：H1 ATR > 5 | 【結構】：H1 同色K線 -> Fibo | 【進場】：M5 0.618 + 吞沒 | 【防禦】：0.5R止損減半"
-    my_strategy = st.text_area("SOP 定義：", value=default_sop, height=200)
+    # 賬戶監控 (動態調整)
+    if "5k" in strategy_mode:
+        balance = st.number_input("當前 5k 帳戶餘額:", value=5000.0)
+        st.warning(f"今日最大虧損限額: ${balance * 0.05:.2f}")
+    else:
+        balance = st.number_input("當前 100k 帳戶餘額:", value=100000.0)
+        st.info(f"單筆 1% 風險建議: ${balance * 0.01:.2f}")
+
+    st.divider()
+    # 策略定義區 (根據選擇自動更新)
+    if "5k" in strategy_mode:
+        current_sop = "【邏輯】：H1順勢 + M5折扣區(0.618)動能反轉。止損減半機制。"
+    else:
+        current_sop = "【邏輯】：D1趨勢 + PDH/PDL 獵殺 + H4 影線 SFP + H1 MSS 結構破壞 + OB/Fibo 共振進場。"
+    
+    my_strategy = st.text_area("當前 SOP 核心：", value=current_sop, height=200)
 
 # --- AI 核心函數 ---
 def get_ai_response(prompt, key):
@@ -38,89 +47,42 @@ def get_ai_response(prompt, key):
         model = genai.GenerativeModel(best_model)
         return model.generate_content(prompt).text
     except Exception as e:
-        return f"AI 服務異常: {e}"
-
-# --- 功能：5星新聞抓取 ---
-def fetch_news():
-    try:
-        rss_url = "https://search.cnbc.com/rs/search/view.xml?partnerId=2000&keywords=macroeconomics&sort=date"
-        feed = feedparser.parse(rss_url)
-        return "\n\n".join([f"標題: {e.title} \n摘要: {e.summary}" for e in feed.entries[:15]])
-    except:
-        return "無法獲取新聞流。"
+        return f"AI 異常: {e}"
 
 # --- 主頁面 ---
+st.title(f"🏹 {strategy_mode} 決策與進化中心")
 
-# A. 頂部：5星級核彈雷達 (僅顯示 9 分以上消息)
-st.title("🛡️ 策略進化與風險監控中心")
-
+# 1. 5星預警 (雷達)
 if api_key:
     if st.button("📡 掃描 5 星級核彈預警"):
         with st.spinner("正在排查全球宏觀噪音..."):
-            raw_data = fetch_news()
-            prompt = f"分析以下新聞：{raw_data}。規則：只有影響力評分 >= 9 的新聞才報告。如果沒有，請精確回答 SAFE。如果有，請給出警告和操作禁令。"
+            feed = feedparser.parse("https://search.cnbc.com/rs/search/view.xml?partnerId=2000&keywords=macroeconomics&sort=date")
+            raw_data = "\n\n".join([f"標題: {e.title} \n摘要: {e.summary}" for e in feed.entries[:15]])
+            prompt = f"分析新聞：{raw_data}。只有影響力評分 >= 9 且對黃金/外匯有重磅衝擊的新聞才報告。否則回答 SAFE。"
             warning_res = get_ai_response(prompt, api_key)
-            
             if warning_res and "SAFE" not in warning_res:
-                st.error(f"🚨🚨🚨 偵測到 5 星級核彈事件：\n\n{warning_res}")
+                st.error(f"🚨 5星預警：{warning_res}")
             else:
-                st.success("✅ 目前市場環境無 5 星級威脅，請專注於 SOP 執行。")
+                st.success("✅ 市場環境目前無 5 星級威脅。")
 
 st.divider()
 
-# B. 中部：策略量化研究室 (含數據視覺化)
+# 2. 策略量化研究室
 st.subheader("🔬 策略量化研究室")
-st.write("上傳你的 CSV 交易歷史，AI 將找出肉眼看不見的隱藏規律。")
-
-uploaded_file = st.file_uploader("導入交易記錄 CSV", type="csv")
+uploaded_file = st.file_uploader("導入交易記錄 CSV (對應當前選中策略)", type="csv")
 
 if uploaded_file:
     df = pd.read_csv(uploaded_file)
-    
-    # --- 數據視覺化展示 ---
-    st.subheader("📊 策略執行統計")
-    col_v1, col_v2 = st.columns(2)
-    
-    with col_v1:
-        # 如果 CSV 裡有 Result (TP/SL/Half-SL) 這一列，自動畫圖
-        if 'Result' in df.columns:
-            st.write("勝率分佈圖 (TP vs SL)")
-            res_chart = df['Result'].value_counts()
-            st.bar_chart(res_chart)
-        else:
-            st.info("提示：如果在 CSV 增加 'Result' 列，此處可顯示勝率圖表。")
+    st.write("📊 數據預覽：")
+    st.dataframe(df.head(5), use_container_width=True)
+
+    st.subheader("🧠 執行策略審計與模式識別")
+    trade_context = st.text_area("補充此單/此階段的開倉心理或背景描述：")
+
+    if st.button("🧪 執行深度進化分析") and api_key:
+        with st.spinner("軍師正在比對當前 SOP 進行數據分析..."):
+            data_str = df.to_string()
+            prompt = f"""
+            你是一名頂級量化分析師。請針對交易員正在使用的【策略 {strategy_mode}】進行審計。
             
-    with col_v2:
-        st.write("核心數據摘要")
-        st.dataframe(df.describe())
-
-    st.divider()
-    
-    # --- AI 深度分析 ---
-    st.subheader("🧠 執行深度量化分析")
-    context = st.text_area("補充最近的心得或盤感：")
-    
-    if st.button("🧪 啟動 AI 模式識別"):
-        if not api_key:
-            st.warning("👈 請先輸入 API Key")
-        else:
-            with st.spinner("軍師正在分析數據相關性..."):
-                data_str = df.to_string()
-                prompt = f"""
-                你是一名量化數據分析師。
-                【我的 SOP】：{my_strategy}
-                【交易記錄數據】：{data_str}
-                【主觀背景】：{context}
-                
-                任務：
-                1. 找出虧損單中除了 SOP 之外的共同環境特徵。
-                2. 分析 MAEx，判斷止損緩衝是否合理。
-                3. 給出 2 條具體的進化建議，以適應 Funding Pips 5k 帳戶。
-                """
-                analysis_res = get_ai_response(prompt, api_key)
-                st.success("🔬 策略研究報告已生成：")
-                st.markdown(analysis_res)
-
-# 頁腳
-st.divider()
-st.caption("TRADE AI | 數據驅動 | 絕對理性 | 專為 Funding Pips 5k 設計")
+            【SOP 規則】：{m
