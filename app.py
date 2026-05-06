@@ -12,7 +12,7 @@ if api_key:
     try:
         # 2. 激活 AI 大脑
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        model = genai.GenerativeModel('gemini-pro')
         
         st.success("✅ AI 大脑已连接！")
         
